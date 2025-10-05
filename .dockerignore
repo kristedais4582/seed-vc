@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+*.ipynb
+checkpoints/
+cache/
+*.wav
+*.mp3
+*.zip
