@@ -1,13 +1,77 @@
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.env
-.git
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
 .gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+LICENSE
+
+# Jupyter notebooks
 *.ipynb
+.ipynb_checkpoints/
+
+# Model checkpoints (download at runtime)
 checkpoints/
 cache/
+runs/
+*.pth
+*.ckpt
+*.safetensors
+
+# Audio files
 *.wav
 *.mp3
+*.flac
+*.ogg
+*.opus
+*.m4a
+
+# Archives
 *.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Tests and examples
+tests/
+examples/
+baselines/
+
+# Environment files
+.env
+.env.*
+
+# Docker
+.dockerignore
+Dockerfile*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# OS files
+.DS_Store
+Thumbs.db
