@@ -35,95 +35,131 @@ def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # Load default model from HuggingFace if not specified
-    if not args.checkpoint or not args.config:
-        print("Loading default model from HuggingFace...")
-        try:
-            from hf_utils import load_custom_model_from_hf
-            model, config = load_custom_model_from_hf(
-                "Plachta/Seed-VC",
-                "DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth",
-                "config_dit_mel_seed_uvit_whisper_small_wavenet.yml"
-            )
-        except Exception as e:
-            print(f"Error loading model: {e}")
-            return None, None
-    else:
-        # Load custom model
-        print(f"Loading custom model from {args.checkpoint}")
-        try:
-            with open(args.config) as f:
+    try:
+        # Load config
+        if args.config:
+            config_path = args.config
+        else:
+            # Try default config path
+            config_path = "./configs/config.yaml"
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
             config = recursive_munch(config)
-            model = torch.load(args.checkpoint, map_location=device)
-        except Exception as e:
-            print(f"Error loading custom model: {e}")
-            return None, None
-    
-    if model:
-        model = model.to(device)
-        if args.fp16:
-            model = model.half()
-        model.eval()
+            print(f"Config loaded from {config_path}")
+        else:
+            print(f"Config file not found at {config_path}, using default HF model")
+            config = None
+        
+        # Load model
+        if args.checkpoint:
+            checkpoint_path = args.checkpoint
+            model = load_custom_model_from_hf(checkpoint_path, device, fp16=args.fp16)
+        else:
+            # Use default model from HuggingFace
+            model = load_custom_model_from_hf(
+                "Plachta/Seed-VC",
+                device,
+                fp16=args.fp16
+            )
+        
+        # Validate that model is actually a model object and not a string or error
+        if model is None:
+            raise ValueError("Model loading failed: model is None")
+        
+        if isinstance(model, str):
+            raise ValueError(f"Model loading failed: {model}")
+        
+        # Only move model to device if it's a valid model object
+        if hasattr(model, 'to'):
+            model = model.to(device)
+            if args.fp16 and device.type == "cuda":
+                model = model.half()
+            model.eval()
+            print("Model loaded successfully!")
+        else:
+            raise ValueError("Model object does not have 'to' method")
+            
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        print(f"Full error: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     return model, config
 
-def voice_conversion(source_audio, target_audio, diffusion_steps=25, length_adjust=1.0, inference_cfg_rate=0.7):
+def voice_conversion(source_audio, target_voice, pitch_shift=0):
     """Perform voice conversion"""
     try:
         if model is None:
-            return None, "Model not loaded. Please check the logs."
+            return None, "Model not loaded. Please restart the application."
         
-        # This is a simplified version - actual implementation would call inference functions
-        return None, "Voice conversion functionality is being prepared. Please use the command line interface for now."
+        # Placeholder for actual voice conversion logic
+        # This would need to be implemented based on the Seed-VC model API
+        return source_audio, "Voice conversion not yet implemented"
+    
     except Exception as e:
         return None, f"Error during conversion: {str(e)}"
 
-# Initialize model on startup
-print("Initializing voice conversion model...")
-model, config = load_model()
-
-if model is None:
-    print("Warning: Model failed to load. The app will run but conversions will not work.")
-
-# Create Gradio interface
-with gr.Blocks(title="Seed-VC Voice Conversion") as demo:
-    gr.Markdown("# Seed-VC Voice Conversion")
-    gr.Markdown("Upload source and target audio files for zero-shot voice conversion.")
-    
-    with gr.Row():
-        with gr.Column():
-            source_audio = gr.Audio(label="Source Audio (audio to convert)", type="filepath")
-            target_audio = gr.Audio(label="Target Audio (reference voice)", type="filepath")
+def create_demo():
+    """Create Gradio demo interface"""
+    with gr.Blocks(title="Seed-VC Voice Conversion") as demo:
+        gr.Markdown("# Seed-VC Voice Conversion Demo")
+        gr.Markdown("Upload a source audio and select a target voice for conversion.")
         
-        with gr.Column():
-            output_audio = gr.Audio(label="Converted Audio", type="filepath")
-            status_text = gr.Textbox(label="Status", interactive=False)
-    
-    with gr.Row():
-        diffusion_steps = gr.Slider(minimum=4, maximum=50, value=25, step=1, label="Diffusion Steps")
-        length_adjust = gr.Slider(minimum=0.5, maximum=2.0, value=1.0, step=0.1, label="Length Adjust")
-        inference_cfg_rate = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, step=0.1, label="Inference CFG Rate")
-    
-    convert_btn = gr.Button("Convert Voice", variant="primary")
-    convert_btn.click(
-        fn=voice_conversion,
-        inputs=[source_audio, target_audio, diffusion_steps, length_adjust, inference_cfg_rate],
-        outputs=[output_audio, status_text]
-    )
-    
-    gr.Markdown("---")
-    gr.Markdown("### Note")
-    gr.Markdown("For full functionality, please ensure all model files are downloaded and dependencies are installed.")
-    gr.Markdown("For production use, consider using the command-line inference script.")
+        with gr.Row():
+            with gr.Column():
+                source_audio = gr.Audio(label="Source Audio", type="filepath")
+                target_voice = gr.Textbox(label="Target Voice (speaker ID or path)")
+                pitch_shift = gr.Slider(
+                    minimum=-12,
+                    maximum=12,
+                    value=0,
+                    step=1,
+                    label="Pitch Shift (semitones)"
+                )
+                convert_btn = gr.Button("Convert", variant="primary")
+            
+            with gr.Column():
+                output_audio = gr.Audio(label="Converted Audio")
+                status_text = gr.Textbox(label="Status")
+        
+        convert_btn.click(
+            fn=voice_conversion,
+            inputs=[source_audio, target_voice, pitch_shift],
+            outputs=[output_audio, status_text]
+        )
+        
+    return demo
 
-# Launch the app
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    print(f"Starting Gradio server on port {port}...")
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=port,
-        share=args.share,
-        show_error=True
-    )
+    print("Starting Seed-VC application...")
+    print(f"Python version: {sys.version}")
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    
+    try:
+        # Load model
+        print("Loading model...")
+        load_model()
+        
+        # Create and launch demo
+        print("Creating demo interface...")
+        demo = create_demo()
+        
+        # Get port from environment variable (Cloud Run uses PORT env var)
+        port = int(os.environ.get("PORT", 8080))
+        
+        print(f"Launching on port {port}...")
+        demo.launch(
+            server_name="0.0.0.0",
+            server_port=port,
+            share=args.share
+        )
+    except Exception as e:
+        print(f"Failed to start application: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
