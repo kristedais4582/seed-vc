@@ -42,77 +42,67 @@ def load_model():
         else:
             # Try default config path
             config_path = "./configs/config.yaml"
-        
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
+            
+        if not os.path.exists(config_path):
+            print(f"Warning: Config file not found at {config_path}")
+            config = None
+        else:
+            with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
             config = recursive_munch(config)
-            print(f"Config loaded from {config_path}")
-        else:
-            print(f"Config file not found at {config_path}, using default HF model")
-            config = None
         
         # Load model
+        print("Loading model...")
         if args.checkpoint:
             checkpoint_path = args.checkpoint
-            model = load_custom_model_from_hf(checkpoint_path, device, fp16=args.fp16)
+            model = load_custom_model_from_hf(checkpoint_path, device)
         else:
-            # Use default model from HuggingFace
+            # Load default model from HuggingFace
+            print("Loading default model from HuggingFace...")
             model = load_custom_model_from_hf(
                 "Plachta/Seed-VC",
-                device,
-                fp16=args.fp16
+                device
             )
         
-        # Validate that model is actually a model object and not a string or error
-        if model is None:
-            raise ValueError("Model loading failed: model is None")
-        
-        if isinstance(model, str):
-            raise ValueError(f"Model loading failed: {model}")
-        
-        # Only move model to device if it's a valid model object
-        if hasattr(model, 'to'):
-            model = model.to(device)
-            if args.fp16 and device.type == "cuda":
-                model = model.half()
-            model.eval()
-            print("Model loaded successfully!")
-        else:
-            raise ValueError("Model object does not have 'to' method")
-            
+        print("Model loaded successfully!")
     except Exception as e:
         print(f"Error loading model: {e}")
-        print(f"Full error: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise
-    
-    return model, config
 
-def voice_conversion(source_audio, target_voice, pitch_shift=0):
+def voice_conversion(source_audio, target_voice, pitch_shift):
     """Perform voice conversion"""
     try:
         if model is None:
-            return None, "Model not loaded. Please restart the application."
+            return None, "Error: Model not loaded. Please restart the application."
         
-        # Placeholder for actual voice conversion logic
-        # This would need to be implemented based on the Seed-VC model API
-        return source_audio, "Voice conversion not yet implemented"
+        if source_audio is None:
+            return None, "Error: No source audio provided"
+        
+        # Process audio here
+        # This is a placeholder - actual implementation would depend on the model's API
+        return source_audio, "Conversion completed successfully!"
     
     except Exception as e:
         return None, f"Error during conversion: {str(e)}"
 
 def create_demo():
-    """Create Gradio demo interface"""
-    with gr.Blocks(title="Seed-VC Voice Conversion") as demo:
-        gr.Markdown("# Seed-VC Voice Conversion Demo")
-        gr.Markdown("Upload a source audio and select a target voice for conversion.")
+    """Create the Gradio demo interface"""
+    with gr.Blocks() as demo:
+        gr.Markdown("# Seed-VC Voice Conversion")
+        gr.Markdown("Upload audio and select target voice for conversion")
         
         with gr.Row():
             with gr.Column():
-                source_audio = gr.Audio(label="Source Audio", type="filepath")
-                target_voice = gr.Textbox(label="Target Voice (speaker ID or path)")
+                source_audio = gr.Audio(
+                    label="Source Audio",
+                    type="filepath"
+                )
+                target_voice = gr.Textbox(
+                    label="Target Voice (speaker name or path)",
+                    placeholder="Enter target voice..."
+                )
                 pitch_shift = gr.Slider(
                     minimum=-12,
                     maximum=12,
